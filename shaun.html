@@ -21,23 +21,20 @@
 		</style>
 	</head>
 	<body>
-		<b>JS-XLSX (XLSX/XLSB/XLSM/XLS/XML) Live Demo</b><br />
-		Output Format:
-		<select name="format">
-			<option value="csv"> CSV</option>
-			<option value="shaun" selected> SHAUN</option>
-			<option value="json"> JSON</option>
-			<option value="form"> FORMULAE</option>
-		</select><br />
+
 
 		<div id="drop">Drop a spreadsheet file here to see sheet data</div>
 		<p><input type="file" name="xlfile" id="xlf" /> ... or click here to select a file</p>
-		<textarea id="b64data">... or paste a base64-encoding here</textarea>
-		<input type="button" id="dotext" value="Click here to process the base64 text" onclick="b64it();"/><br />
-		Advanced Demo Options: <br />
-		Use Web Workers: (when available) <input type="checkbox" name="useworker"><br />
-		Use Transferrables: (when available) <input type="checkbox" name="xferable" checked><br />
-		Use readAsBinaryString: (when available) <input type="checkbox" name="userabs" checked><br />
+		
+		<p>
+			TAFFY query examples / notes:
+			<pre>
+sheets["2018-10"]({"COURSE": {like:"AGRI"}}).count();
+sheets["2018-10"]({"COURSE": {like:"AGRI"}}).first();
+sheets["2018-10"]({"DEPT": "AGRI"}).first();
+
+			</pre>
+		</p>
 		<pre id="out"></pre>
 		<br />
 		<script src="js/js-xlsx/shim.js"></script>
@@ -57,22 +54,9 @@
 		    };
 
 		    var rABS = typeof FileReader !== "undefined" && typeof FileReader.prototype !== "undefined" && typeof FileReader.prototype.readAsBinaryString !== "undefined";
-		    if(!rABS) {
-			    document.getElementsByName("userabs")[0].disabled = true;
-			    document.getElementsByName("userabs")[0].checked = false;
-		    }
-
-		    var use_worker = typeof Worker !== 'undefined';
-		    if(!use_worker) {
-			    document.getElementsByName("useworker")[0].disabled = true;
-			    document.getElementsByName("useworker")[0].checked = false;
-		    }
+		    var use_worker = false;
 
 		    var transferable = use_worker;
-		    if(!transferable) {
-			    document.getElementsByName("xferable")[0].disabled = true;
-			    document.getElementsByName("xferable")[0].checked = false;
-		    }
 
 		    var wtf_mode = false;
 
@@ -127,7 +111,6 @@
 		    }
 
 		    function xw(data, cb) {
-			    transferable = document.getElementsByName("xferable")[0].checked;
 			    if(transferable) xw_xfer(data, cb);
 			    else xw_noxfer(data, cb);
 		    }
@@ -171,21 +154,36 @@
 			    workbook.SheetNames.forEach(function(sheetName) {
 				    var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
 				    if(csv.length > 0){
-					    result.push("SHEET: " + sheetName);
+					    result.push("READING SHEET: " + sheetName);
+					    result.push(csv.length + " RECORDS.");
 					    result.push("");
-					    result.push(csv);
-					    // window.csv is set to an object array: window.csv[row]
-					    for (var i = 1; i < csv.length; i++) {
-						    for (var c = 0; c < 6; c++) {
-							    if (!csv[i]['COURSE']) {
-								    Object.assign(csv[i], csv[i-1]);
-								    console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
+
+					    // Iterate over each row to tidy up the data.
+						    for (var i = 1; i < csv.length; i++) {
+							    // Use Object.assign() to fill in missing fields from previous record.
+								    if (!csv[i]['COURSE']) {
+									    Object.assign(csv[i], csv[i-1]);
+									    console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
+								    }
+							    
+							    /* Split COURSE (DEPT*341*001) into three columns for easier queries. */
+							    [csv[i]['DEPT'], csv[i]['NUMBER'], csv[i]['SECT']] = csv[i]["COURSE"].split("*");
+							    
+							    /* Split course time into STARTTIME and ENDTIME for easier queries. */
+							    if (csv[i]["O.TIME"]) {
+								    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = csv[i]["O.TIME"].split("-");
+							    } else {
+								    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = [undefined, undefined];
 							    }
 								    
 						    }
-
-					    }
+					    
 					    window.sheets[sheetName] = TAFFY(csv);
+
+					    result.push("DISTINCT DEPARTMENTS: ");
+					    result.push(window.sheets[sheetName]({DEPT: {isUndefined: false}}).distinct("DEPT").join("\n"));
+					    result.push("");
+					    /* result.push(window.sheets[sheetName]({STARTTIME: {isUndefined: false}}).distinct("STARTTIME").sort().join("\n ")); */
 					    window.csv = csv;
 				    }
 			    });
@@ -214,21 +212,8 @@
 
 		    function process_wb(wb) {
 			    var output = "";
-			    switch(get_radio_value("format")) {
-				    case "json":
-					    output = JSON.stringify(to_json(wb), 2, 2);
-					    window.thething = to_json(wb);
-					    break;
-				    case "form":
-					    output = to_formulae(wb);
-					    break;
-					    
-				    case "shaun":
-					    output = to_shaun(wb);
-					    break;
-				    default:
-					    output = to_csv(wb);
-			    }
+			    output = to_shaun(wb);
+			    
 			    if(out.innerText === undefined) out.textContent = output;
 			    else out.innerText = output;
 			    if(typeof console !== 'undefined') console.log("output", new Date());
@@ -238,8 +223,8 @@
 		    function handleDrop(e) {
 			    e.stopPropagation();
 			    e.preventDefault();
-			    rABS = document.getElementsByName("userabs")[0].checked;
-			    use_worker = document.getElementsByName("useworker")[0].checked;
+			    // rABS = document.getElementsByName("userabs")[0].checked;
+			    // use_worker = document.getElementsByName("useworker")[0].checked;
 			    var files = e.dataTransfer.files;
 			    var f = files[0];
 			    {
@@ -281,8 +266,7 @@
 
 		    var xlf = document.getElementById('xlf');
 		    function handleFile(e) {
-			    rABS = document.getElementsByName("userabs")[0].checked;
-			    use_worker = document.getElementsByName("useworker")[0].checked;
+			    //rABS = document.getElementsByName("userabs")[0].checked;
 			    var files = e.target.files;
 			    var f = files[0];
 			    {
