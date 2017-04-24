@@ -35,6 +35,9 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 
 			</pre>
 		</p>
+		<p>
+			<form id="filters"><input type="button" id="apply" value="apply"></input></form>
+		</p>
 		<pre id="out"></pre>
 		<br />
 		<script src="js/js-xlsx/shim.js"></script>
@@ -150,6 +153,7 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 
 		    function to_shaun(workbook) {
 			    var result = [];
+			    window.courses = TAFFY();
 			    window.sheets = {};
 			    workbook.SheetNames.forEach(function(sheetName) {
 				    var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
@@ -158,31 +162,34 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 					    result.push(csv.length + " RECORDS.");
 					    result.push("");
 
-					    // Iterate over each row to tidy up the data.
-						    for (var i = 1; i < csv.length; i++) {
-							    // Use Object.assign() to fill in missing fields from previous record.
-								    if (!csv[i]['COURSE']) {
-									    Object.assign(csv[i], csv[i-1]);
-									    console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
-								    }
-							    
-							    /* Split COURSE (DEPT*341*001) into three columns for easier queries. */
-							    [csv[i]['DEPT'], csv[i]['NUMBER'], csv[i]['SECT']] = csv[i]["COURSE"].split("*");
-							    
-							    /* Split course time into STARTTIME and ENDTIME for easier queries. */
-							    if (csv[i]["O.TIME"]) {
-								    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = csv[i]["O.TIME"].split("-");
-							    } else {
-								    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = [undefined, undefined];
-							    }
-								    
+					    /* Iterate over each row to tidy up the data. */
+					    for (var i = 0; i < csv.length; i++) {
+						    /* Use Object.assign() to fill in missing fields from previous record. */
+						    if (!csv[i]['COURSE']) {
+							    Object.assign(csv[i], csv[i-1]);
+							    console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
 						    }
+						    
+						    /* Split COURSE (DEPT*341*001) into three columns for easier queries. */
+						    [csv[i]['DEPT'], csv[i]['NUMBER'], csv[i]['SECT']] = csv[i]["COURSE"].split("*");
+						    
+						    /* Split course time into STARTTIME and ENDTIME for easier queries. */
+						    if (csv[i]["O.TIME"]) {
+							    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = csv[i]["O.TIME"].split("-");
+						    } else {
+							    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = [undefined, undefined];
+						    }
+						    
+					    }
 					    
 					    window.sheets[sheetName] = TAFFY(csv);
+					    window.courses.merge(csv);
 
-					    result.push("DISTINCT DEPARTMENTS: ");
-					    result.push(window.sheets[sheetName]({DEPT: {isUndefined: false}}).distinct("DEPT").join("\n"));
-					    result.push("");
+					    /*
+					       result.push("DISTINCT DEPARTMENTS: ");
+					       result.push(window.sheets[sheetName]({DEPT: {isUndefined: false}}).distinct("DEPT").join("\n"));
+					       result.push("");
+					     */
 					    /* result.push(window.sheets[sheetName]({STARTTIME: {isUndefined: false}}).distinct("STARTTIME").sort().join("\n ")); */
 					    window.csv = csv;
 				    }
@@ -210,6 +217,66 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			    process_wb(wb);
 		    }
 
+		    function showFilters() {
+			    /* 
+			     * grab the first element off the TAFFY
+			     * database, iterate its keys (excluding
+			     * privates) and show the distinct
+			     * list. Cool. 
+			     */
+			    output = document.getElementById('filters');
+			    
+			    Object.keys(window.courses().first()).filter(function(v) {return !v.startsWith("_");}).forEach(function(k) {
+				    /* For each header `k`, do the following: */
+				    console.log(k);
+				    selectbox = document.createElement("select");
+				    selectbox.id = k;
+				    newoption = document.createElement("option");
+				    newoption.text = k;
+				    selectbox.add(newoption);
+				    
+				    window.courses().distinct(k).filter(function(x){return x != undefined}).map(function (record,recordnumber) {
+					    console.log(record);
+					    newoption = document.createElement("option");
+					    newoption.text = record;
+					    selectbox.add(newoption);
+						    
+				    });
+
+				    output.appendChild(selectbox);
+					    
+					    
+			    });
+		    }
+
+		    function filterKeys() {
+			    /* Return an array of the filter keys (DEPT, TERM, etc) that we know about. */
+			    return Object.keys(window.courses().first()).filter(function(k){return !k.startsWith("_")});
+		    }
+		    
+		    applyBtn = document.getElementById("apply");
+		    function applyFilters() {
+			    window.filters = {};
+			    
+			    console.log("Applying them filters.");
+			    /* Build the list of filters */
+			    filterKeys().map(function(k) {
+				    console.log(k);
+				    filterSelect = document.getElementById(k);
+				    selectedValue = filterSelect.options[filterSelect.selectedIndex].text;
+				    if (selectedValue != k) {
+					    window.filters[k] = selectedValue;
+					    console.log("Filter on: " + k + "=" + selectedValue);
+				    }
+			    });
+
+			    console.log("Filtered to " + window.courses(window.filters).count());
+			    
+			    
+		    }
+		    applyBtn.addEventListener('click', applyFilters, false);
+		    
+		    
 		    function process_wb(wb) {
 			    var output = "";
 			    output = to_shaun(wb);
@@ -217,6 +284,12 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			    if(out.innerText === undefined) out.textContent = output;
 			    else out.innerText = output;
 			    if(typeof console !== 'undefined') console.log("output", new Date());
+			    
+			    /*
+			     * Entry point into other code.
+			     */
+			    
+			    showFilters();
 		    }
 
 		    var drop = document.getElementById('drop');
@@ -227,28 +300,26 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			    // use_worker = document.getElementsByName("useworker")[0].checked;
 			    var files = e.dataTransfer.files;
 			    var f = files[0];
-			    {
-				    var reader = new FileReader();
-				    var name = f.name;
-				    reader.onload = function(e) {
-					    if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
-					    var data = e.target.result;
-					    if(use_worker) {
-						    xw(data, process_wb);
+			    var reader = new FileReader();
+			    var name = f.name;
+			    reader.onload = function(e) {
+				    if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
+				    var data = e.target.result;
+				    if(use_worker) {
+					    xw(data, process_wb);
+				    } else {
+					    var wb;
+					    if(rABS) {
+						    wb = X.read(data, {type: 'binary'});
 					    } else {
-						    var wb;
-						    if(rABS) {
-							    wb = X.read(data, {type: 'binary'});
-						    } else {
-							    var arr = fixdata(data);
-							    wb = X.read(btoa(arr), {type: 'base64'});
-						    }
-						    process_wb(wb);
+						    var arr = fixdata(data);
+						    wb = X.read(btoa(arr), {type: 'base64'});
 					    }
-				    };
-				    if(rABS) reader.readAsBinaryString(f);
-				    else reader.readAsArrayBuffer(f);
-			    }
+					    process_wb(wb);
+				    }
+			    };
+			    if(rABS) reader.readAsBinaryString(f);
+			    else reader.readAsArrayBuffer(f);
 		    }
 
 		    function handleDragover(e) {
