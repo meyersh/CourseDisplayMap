@@ -26,6 +26,17 @@
 		<div id="drop">Drop a spreadsheet file here to see sheet data</div>
 		<p><input type="file" name="xlfile" id="xlf" /> ... or click here to select a file</p>
 		
+
+		<p>
+			<form id="filtersForm">
+				<input type="button" id="clearBtn" value="clear all filters" />
+				<input type="button" id="applyBtn" value="add selected filters" />
+			</form>
+		</p>
+		<pre id="out"></pre>
+		<br />
+		<div id="results"></div>
+
 		<p>
 			TAFFY query examples / notes:
 			<pre>
@@ -35,11 +46,7 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 
 			</pre>
 		</p>
-		<p>
-			<form id="filters"><input type="button" id="apply" value="apply"></input></form>
-		</p>
-		<pre id="out"></pre>
-		<br />
+		
 		<script src="js/js-xlsx/shim.js"></script>
 		<script src="js/taffydb/taffy.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.9.1/xlsx.full.min.js"></script>
@@ -127,29 +134,6 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			    }
 		    }
 
-		    function to_json(workbook) {
-			    var result = {};
-			    workbook.SheetNames.forEach(function(sheetName) {
-				    var roa = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
-				    if(roa.length > 0){
-					    result[sheetName] = roa;
-				    }
-			    });
-			    return result;
-		    }
-
-		    function to_csv(workbook) {
-			    var result = [];
-			    workbook.SheetNames.forEach(function(sheetName) {
-				    var csv = X.utils.sheet_to_csv(workbook.Sheets[sheetName]);
-				    if(csv.length > 0){
-					    result.push("SHEET: " + sheetName);
-					    result.push("");
-					    result.push(csv);
-				    }
-			    });
-			    return result.join("\n");
-		    }
 
 		    function to_shaun(workbook) {
 			    var result = [];
@@ -158,7 +142,7 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			    workbook.SheetNames.forEach(function(sheetName) {
 				    var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
 				    if(csv.length > 0){
-					    result.push("READING SHEET: " + sheetName);
+					    result.push("READING XLS SHEET: " + sheetName);
 					    result.push(csv.length + " RECORDS.");
 					    result.push("");
 
@@ -186,25 +170,12 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 					    window.courses.merge(csv);
 
 					    /*
-					       result.push("DISTINCT DEPARTMENTS: ");
+					       resultxb.push("DISTINCT DEPARTMENTS: ");
 					       result.push(window.sheets[sheetName]({DEPT: {isUndefined: false}}).distinct("DEPT").join("\n"));
 					       result.push("");
 					     */
 					    /* result.push(window.sheets[sheetName]({STARTTIME: {isUndefined: false}}).distinct("STARTTIME").sort().join("\n ")); */
 					    window.csv = csv;
-				    }
-			    });
-			    return result.join("\n");
-		    }
-
-		    function to_formulae(workbook) {
-			    var result = [];
-			    workbook.SheetNames.forEach(function(sheetName) {
-				    var formulae = X.utils.get_formulae(workbook.Sheets[sheetName]);
-				    if(formulae.length > 0){
-					    result.push("SHEET: " + sheetName);
-					    result.push("");
-					    result.push(formulae.join("\n"));
 				    }
 			    });
 			    return result.join("\n");
@@ -217,14 +188,14 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			    process_wb(wb);
 		    }
 
-		    function showFilters() {
+		    function showFilterControls() {
 			    /* 
 			     * grab the first element off the TAFFY
-			     * database, iterate its keys (excluding
-			     * privates) and show the distinct
-			     * list. Cool. 
+			     * database, iterate its keys (excluding 
+			     * privates named by '__xx') and show the
+			     * distinct * list as a control panel. Cool.
 			     */
-			    output = document.getElementById('filters');
+			    output = document.getElementById('filtersForm');
 			    
 			    Object.keys(window.courses().first()).filter(function(v) {return !v.startsWith("_");}).forEach(function(k) {
 				    /* For each header `k`, do the following: */
@@ -250,13 +221,13 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 		    }
 
 		    function filterKeys() {
-			    /* Return an array of the filter keys (DEPT, TERM, etc) that we know about. */
+			    /* Return an array of the filter keys
+			    (DEPT, TERM, etc) that we know about. */
 			    return Object.keys(window.courses().first()).filter(function(k){return !k.startsWith("_")});
 		    }
 		    
-		    applyBtn = document.getElementById("apply");
+		    applyBtn = document.getElementById("applyBtn");
 		    function applyFilters() {
-			    window.filters = {};
 			    
 			    console.log("Applying them filters.");
 			    /* Build the list of filters */
@@ -264,18 +235,38 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 				    console.log(k);
 				    filterSelect = document.getElementById(k);
 				    selectedValue = filterSelect.options[filterSelect.selectedIndex].text;
-				    if (selectedValue != k) {
-					    window.filters[k] = selectedValue;
+				    if (selectedValue != k) { /* k would be TERM, or COURSE, or whatever default value , we skip those. */
+
+					    /* window.filters[k] must always be a list, so create it as one, or append, to add new things. */
+					    if (window.filters[k] && !(selectedValue in window.filters[k])) {
+						    window.filters[k].push(selectedValue);
+					    } else {
+						    window.filters[k] = [selectedValue];
+					    }
+
+					    /* Reset drop down value and log changes. */
+
+					    filterSelect.selectedIndex = 0;
 					    console.log("Filter on: " + k + "=" + selectedValue);
 				    }
 			    });
 
 			    console.log("Filtered to " + window.courses(window.filters).count());
+
+			    /* Show results. */
+			document.getElementById('results').innerHTML = '<table border="1">' + window.courses(window.filters).supplant("<tr><td>{TERM}</td><td>{COURSE}</td><td>{STARTTIME}-{ENDTIME}</td><td>{O.DAY}</td></tr>") + "</table>";
 			    
 			    
 		    }
 		    applyBtn.addEventListener('click', applyFilters, false);
 		    
+		    function clearFilters() {
+			    /* Clear list of applied filters. */
+			    window.filters = {};
+			    console.info('Filters cleared.');
+		    }
+		    document.getElementById("clearBtn").addEventListener('click', clearFilters, false);
+
 		    
 		    function process_wb(wb) {
 			    var output = "";
@@ -289,7 +280,7 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			     * Entry point into other code.
 			     */
 			    
-			    showFilters();
+			    showFilterControls();
 		    }
 
 		    var drop = document.getElementById('drop');
@@ -365,6 +356,13 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 		    }
 
 		    if(xlf.addEventListener) xlf.addEventListener('change', handleFile, false);
+
+
+		    window.onload = function() {
+			    /* Perform any necessary initialization of resources. */
+			    clearFilters()
+		    }
+		    
 		</script>
 		<script type="text/javascript">
 		    var _gaq = _gaq || [];
