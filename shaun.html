@@ -254,7 +254,9 @@ sheets["2018-10"]({"DEPT": "AGRI"}).first();
 			    console.log("Filtered to " + window.courses(window.filters).count());
 
 			    /* Show results. */
-			document.getElementById('results').innerHTML = '<table border="1">' + window.courses(window.filters).supplant("<tr><td>{TERM}</td><td>{COURSE}</td><td>{STARTTIME}-{ENDTIME}</td><td>{O.DAY}</td></tr>") + "</table>";
+			    document.getElementById('results').innerHTML = '<table border="1">' +
+				    window.courses(window.filters).supplant("<tr><td>{TERM}</td><td>{COURSE}</td><td>{STARTTIME}-{ENDTIME}</td><td>{O.DAY}</td></tr>") +
+				    "</table>";
 			    
 			    
 		    }
