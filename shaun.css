@@ -1,0 +1,45 @@
+body {
+    font-family: sans-serif;
+}
+#drop{
+            border:2px dashed #ffa31a;
+            -moz-border-radius:5px;
+            -webkit-border-radius:5px;
+            border-radius:5px;
+            padding:25px;
+            text-align:center;
+            font:20pt bold,"Vollkorn";color:#bbb
+        }
+        
+#b64data{
+            width:100%;
+        }
+           
+select {
+            max-width: 100px;
+            margin: 4px;
+        }
+table {
+            border: 2px solid black;
+            border-collapse: collapse;
+        }
+td, tr {
+            padding: 10px;
+            margin: 10px;            
+        }
+        
+tr:nth-child(even) {
+            background-color: lightgray;
+        }
+#filtersForm, #out, #currentFilters {
+            max-width: 50%;
+        }
+#calendar {
+    float: right;
+    max-width: 50%;
+    }
+
+/*tr:nth-child(odd){
+    background-color: #ffa31a;
+    background-color: black;
+}*/

@@ -4,21 +4,8 @@
 <html>
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-        <title>JS-XLSX Live Demo</title>
-        <style>
-         #drop{
-             border:2px dashed #bbb;
-             -moz-border-radius:5px;
-             -webkit-border-radius:5px;
-             border-radius:5px;
-             padding:25px;
-             text-align:center;
-             font:20pt bold,"Vollkorn";color:#bbb
-         }
-         #b64data{
-             width:100%;
-         }
-        </style>
+        <title>Course Display Map</title>
+        <link rel="stylesheet" type="text/css" href="shaun.css"/>
     </head>
     <body>
 
@@ -28,19 +15,20 @@
 
 
         <p>
-            <form id="filtersForm">
+            <form id="filtersFormButtons">
                 <input type="button" id="clearBtn" value="clear all filters" />
                 <input type="button" id="applyBtn" value="add selected filters" />
             </form>
+            <form id="filtersForm">
+            </form>
         </p>
-        <pre id="out"></pre>
-        <pre id="currentFilters"></pre>
+        <div id="currentFilters"></div>
         <br />
         <table id="calendar" border="1">
 
             <tr><th>Time</th><td>MON</td><td>TUE</td><td>WED</td><td>THUR</td><td>FRI</td></tr>
             <tr><td id="hourCol"></td><td id="monCol"></td><td id="tueCol"></td><td id="wedCol"></td><td id="thurCol"></td><td id="friCol"></td></tr>
-                        <tr><td id="HOURCol6Hour">6:00</td><td id="monCol6Hour"></td><td id="tueCol6Hour"></td><td id="wedCol6Hour"></td><td id="thurCol6Hour"></td><td id="friCol6Hour"></td></tr>
+            <tr><td id="HOURCol6Hour">6:00</td><td id="monCol6Hour"></td><td id="tueCol6Hour"></td><td id="wedCol6Hour"></td><td id="thurCol6Hour"></td><td id="friCol6Hour"></td></tr>
             <tr><td id="HOURCol7Hour">7:00</td><td id="monCol7Hour"></td><td id="tueCol7Hour"></td><td id="wedCol7Hour"></td><td id="thurCol7Hour"></td><td id="friCol7Hour"></td></tr>
             <tr><td id="HOURCol8Hour">8:00</td><td id="monCol8Hour"></td><td id="tueCol8Hour"></td><td id="wedCol8Hour"></td><td id="thurCol8Hour"></td><td id="friCol8Hour"></td></tr>
             <tr><td id="HOURCol9Hour">9:00</td><td id="monCol9Hour"></td><td id="tueCol9Hour"></td><td id="wedCol9Hour"></td><td id="thurCol9Hour"></td><td id="friCol9Hour"></td></tr>
@@ -60,16 +48,6 @@
 
         </table>
         <div id="results"></div>
-
-        <p>
-            TAFFY query examples / notes:
-            <pre>
-window.courses({"COURSE": {like:"AGRI"}}).count();
-window.courses({"COURSE": {like:"AGRI"}}).first();
-window.courses({"DEPT": "AGRI"}).first();
-
-            </pre>
-        </p>
 
         <script src="js/js-xlsx/shim.js"></script>
         <script src="js/taffydb/taffy.js"></script>
@@ -146,20 +124,6 @@ window.courses({"DEPT": "AGRI"}).first();
              }
          }
 
-         function xw(data, cb) {
-             if(transferable) xw_xfer(data, cb);
-             else xw_noxfer(data, cb);
-         }
-
-         function get_radio_value( radioName ) {
-             var radios = document.getElementsByName( radioName );
-             for( var i = 0; i < radios.length; i++ ) {
-                 if( radios[i].checked || radios.length === 1 ) {
-                     return radios[i].value;
-                 }
-             }
-         }
-
          function timestampTo24Hours(ts) {
              /* Take a timestamp, like 08:00am and return the 24-hour hour portion. */
              if (ts.search('am') != -1)
@@ -178,17 +142,15 @@ window.courses({"DEPT": "AGRI"}).first();
 
          }
 
-
-         function to_shaun(workbook) {
+         function parseWorkbook(workbook) {
              var result = [];
              window.courses = TAFFY();
              window.sheets = {};
              workbook.SheetNames.forEach(function(sheetName) {
                  var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
                  if(csv.length > 0){
-                     result.push("READING XLS SHEET: " + sheetName);
-                     result.push(csv.length + " RECORDS.");
-                     result.push("");
+                     console.info("READING XLS SHEET: " + sheetName);
+                     console.info(csv.length + " RECORDS.");
 
                      /* Iterate over each row to tidy up the data. */
                      for (var i = 0; i < csv.length; i++) {
@@ -201,11 +163,11 @@ window.courses({"DEPT": "AGRI"}).first();
                              for (var fieldIdx in fields) {
                                  fieldName = fields[fieldIdx]
                                  if (!csv[i][fieldName]) {
-                                     console.info('Filling in ' + fieldName)
+                                     console.debug('Filling in ' + fieldName)
                                      csv[i][fieldName] = csv[i-1][fieldName];
                                  }
                              }
-                             console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
+                             console.debug("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
                          }
 
                          /* Split COURSE (DEPT*341*001) into three columns for easier queries. */
@@ -227,7 +189,7 @@ window.courses({"DEPT": "AGRI"}).first();
                              courseID = csv[i]['DEPT'] + "-" + csv[i]['NUMBER'];
                              if (-1 < flags[flag].indexOf(courseID)) {
                                  csv[i][flag] = "true";
-                                 console.log(courseID + " has " + flag)
+                                 console.debug("Flags: " + courseID + " has " + flag)
                              } else {
                                  csv[i][flag] = "false";
                              }
@@ -235,25 +197,17 @@ window.courses({"DEPT": "AGRI"}).first();
 
                      }
 
+                     /* Fold in this worksheet data into the
+                     window.courses TAFFY() database. */
                      window.courses.merge(csv);
 
-                     /*
-                        resultxb.push("DISTINCT DEPARTMENTS: ");
-                        result.push(window.sheets[sheetName]({DEPT: {isUndefined: false}}).distinct("DEPT").join("\n"));
-                        result.push("");
-                      */
-                     /* result.push(window.sheets[sheetName]({STARTTIME: {isUndefined: false}}).distinct("STARTTIME").sort().join("\n ")); */
                      window.csv = csv;
                  }
              });
-             return result.join("\n");
-         }
 
-         var tarea = document.getElementById('b64data');
-         function b64it() {
-             if(typeof console !== 'undefined') console.log("onload", new Date());
-             var wb = X.read(tarea.value, {type: 'base64',WTF:wtf_mode});
-             process_wb(wb);
+             /* All done parsing, lets draw the filter controls. */
+             showFilterControls();
+             return result.join("\n");
          }
 
          function showFilterControls() {
@@ -265,9 +219,11 @@ window.courses({"DEPT": "AGRI"}).first();
               */
              output = document.getElementById('filtersForm');
 
+             output.innerHTML = "";
+
              Object.keys(window.courses().first()).filter(function(v) {return !v.startsWith("_");}).forEach(function(k) {
                  /* For each header `k`, do the following: */
-                 console.log(k);
+                 console.info("Generating filter control for " + k);
                  selectbox = document.createElement("select");
                  selectbox.id = k;
                  newoption = document.createElement("option");
@@ -275,7 +231,7 @@ window.courses({"DEPT": "AGRI"}).first();
                  selectbox.add(newoption);
 
                  window.courses().distinct(k).filter(function(x){return x != undefined}).sort().map(function (record,recordnumber) {
-                     console.log(record);
+                     console.debug("Creating option for" + record);
                      newoption = document.createElement("option");
                      newoption.text = record;
                      selectbox.add(newoption);
@@ -397,7 +353,7 @@ window.courses({"DEPT": "AGRI"}).first();
          function displayCurrentFilters() {
              /* Display current filters (the filters themselves, not the report) */
              currentFiltersElement = document.getElementById('currentFilters');
-             currentFiltersElement.innerHTML = "Current Filters: \n";
+             currentFiltersElement.innerHTML = "Current Filters: <br/>\n";
              window.filters.listFilters().map(function(f) {
                  /* listFilters returns [key, val] for each filter. */
                  [k, v] = f;
@@ -429,23 +385,9 @@ window.courses({"DEPT": "AGRI"}).first();
              });
          }
 
-         function process_wb(wb) {
-             var output = "";
-             output = to_shaun(wb);
-
-             if(out.innerText === undefined) out.textContent = output;
-             else out.innerText = output;
-             if(typeof console !== 'undefined') console.log("output", new Date());
-
-             /*
-              * Entry point into other code.
-              */
-
-             showFilterControls();
-         }
-
          var drop = document.getElementById('drop');
          function handleDrop(e) {
+             console.info('handleDrop');
              e.stopPropagation();
              e.preventDefault();
              // rABS = document.getElementsByName("userabs")[0].checked;
@@ -457,18 +399,19 @@ window.courses({"DEPT": "AGRI"}).first();
              reader.onload = function(e) {
                  if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
                  var data = e.target.result;
-                 if(use_worker) {
-                     xw(data, process_wb);
+
+                 var wb;
+                 if(rABS) {
+                     console.log('rABS = true');
+                     wb = X.read(data, {type: 'binary'});
                  } else {
-                     var wb;
-                     if(rABS) {
-                         wb = X.read(data, {type: 'binary'});
-                     } else {
-                         var arr = fixdata(data);
-                         wb = X.read(btoa(arr), {type: 'base64'});
-                     }
-                     process_wb(wb);
+                     console.log('rABS = false');
+                     var arr = fixdata(data);
+                     wb = X.read(btoa(arr), {type: 'base64'});
                  }
+
+                 parseWorkbook(wb);
+
              };
              if(rABS) reader.readAsBinaryString(f);
              else reader.readAsArrayBuffer(f);
@@ -485,38 +428,6 @@ window.courses({"DEPT": "AGRI"}).first();
              drop.addEventListener('dragover', handleDragover, false);
              drop.addEventListener('drop', handleDrop, false);
          }
-
-
-         var xlf = document.getElementById('xlf');
-         function handleFile(e) {
-             //rABS = document.getElementsByName("userabs")[0].checked;
-             var files = e.target.files;
-             var f = files[0];
-             {
-                 var reader = new FileReader();
-                 var name = f.name;
-                 reader.onload = function(e) {
-                     if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
-                     var data = e.target.result;
-                     if(use_worker) {
-                         xw(data, process_wb);
-                     } else {
-                         var wb;
-                         if(rABS) {
-                             wb = X.read(data, {type: 'binary'});
-                         } else {
-                             var arr = fixdata(data);
-                             wb = X.read(btoa(arr), {type: 'base64'});
-                         }
-                         process_wb(wb);
-                     }
-                 };
-                 if(rABS) reader.readAsBinaryString(f);
-                 else reader.readAsArrayBuffer(f);
-             }
-         }
-
-         if(xlf.addEventListener) xlf.addEventListener('change', handleFile, false);
 
 
          window.onload = function() {
