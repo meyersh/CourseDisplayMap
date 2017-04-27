@@ -35,3 +35,8 @@ to the javascript object
 ```
 
 ...which is the exact format needed to initialize a TAFFY() database instance! During processing, each row is walked and missing data is filled foward (to accomodate labs and others,) a few fields are exploded, and the flag fields are added from the flags.json data.
+
+# Installation
+This html/js app is entirely self-contained and has been fully tested on Google Chrome (and appears to work fine on IE and Firefox.) Therefore, installation may be done by simply downloading the directory and opening CourseDisplayMap.html in a browser (preferably Chrome.) 
+
+Centralized web deployment is also possible, simply load this repositoy (and submodules) into an internet accessible place.
