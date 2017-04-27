@@ -191,9 +191,19 @@ window.courses({"DEPT": "AGRI"}).first();
 
                      /* Iterate over each row to tidy up the data. */
                      for (var i = 0; i < csv.length; i++) {
-                         /* Use Object.assign() to fill in missing fields from previous record. */
+                         /* Fill in missing fields from previous record. */
                          if (!csv[i]['COURSE']) {
-                             Object.assign(csv[i], csv[i-1]);
+                             /* Get field names from last record */
+                             fields = Object.keys(csv[i-1]);
+
+                             /* Import missing fields from last record. */
+                             for (var fieldIdx in fields) {
+                                 fieldName = fields[fieldIdx]
+                                 if (!csv[i][fieldName]) {
+                                     console.info('Filling in ' + fieldName)
+                                     csv[i][fieldName] = csv[i-1][fieldName];
+                                 }
+                             }
                              console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
                          }
 
