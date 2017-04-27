@@ -221,6 +221,17 @@ window.courses({"DEPT": "AGRI"}).first();
                              csv[i]['STARTHOUR'] = undefined;
                          }
 
+                         /* Work out flag column(s) */
+                         for (var flag in flags) {
+                             courseID = csv[i]['DEPT'] + "-" + csv[i]['NUMBER'];
+                             if (-1 < flags[flag].indexOf(courseID)) {
+                                 csv[i][flag] = "true";
+                                 console.log(courseID + " has " + flag)
+                             } else {
+                                 csv[i][flag] = "false";
+                             }
+                         }
+
                      }
 
                      window.sheets[sheetName] = TAFFY(csv);
