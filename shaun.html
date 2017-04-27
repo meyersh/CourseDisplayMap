@@ -40,6 +40,7 @@
 
             <tr><th>Time</th><td>MON</td><td>TUE</td><td>WED</td><td>THUR</td><td>FRI</td></tr>
             <tr><td id="hourCol"></td><td id="monCol"></td><td id="tueCol"></td><td id="wedCol"></td><td id="thurCol"></td><td id="friCol"></td></tr>
+                        <tr><td id="HOURCol6Hour">6:00</td><td id="monCol6Hour"></td><td id="tueCol6Hour"></td><td id="wedCol6Hour"></td><td id="thurCol6Hour"></td><td id="friCol6Hour"></td></tr>
             <tr><td id="HOURCol7Hour">7:00</td><td id="monCol7Hour"></td><td id="tueCol7Hour"></td><td id="wedCol7Hour"></td><td id="thurCol7Hour"></td><td id="friCol7Hour"></td></tr>
             <tr><td id="HOURCol8Hour">8:00</td><td id="monCol8Hour"></td><td id="tueCol8Hour"></td><td id="wedCol8Hour"></td><td id="thurCol8Hour"></td><td id="friCol8Hour"></td></tr>
             <tr><td id="HOURCol9Hour">9:00</td><td id="monCol9Hour"></td><td id="tueCol9Hour"></td><td id="wedCol9Hour"></td><td id="thurCol9Hour"></td><td id="friCol9Hour"></td></tr>
@@ -333,7 +334,6 @@ window.courses({"DEPT": "AGRI"}).first();
                 cell. */
              clearCalendarTable();
              window.courses(window.filters.generateQuery()).map(function (record, result) {
-                 console.log(record);
 
                  /* Skip undefined days */
                  days = record["O.DAY"];
@@ -344,17 +344,22 @@ window.courses({"DEPT": "AGRI"}).first();
                  /* undefined start times go at 0700 */
                  starthour = record["STARTHOUR"]
                  if (starthour == undefined) {
-                     starthour = 7;
+                     starthour = 6;
                  }
 
                  /* Process MTWThF */
                  days = days.replace('TH', 'H');
-                 console.log("Processing " + days);
 
                  dayMap = {'M': 'monCol', 'T': 'tueCol', 'W': 'wedCol', 'H': 'thurCol', 'F': 'friCol'};
                  for (var i = 0, len = days.length; i < len; i++) {
                      var cellId = dayMap[days[i]] + starthour + "Hour";
-                     document.getElementById(cellId).innerHTML += record['COURSE'] + "<br/>";
+                     cellObj = document.getElementById(cellId);
+                     if (!cellObj) {
+                         console.warn("Missing cell obj for " + cellId);
+                     } else {
+                         cellObj.innerHTML += record['COURSE'] + "<br/>";
+                     }
+
                  }
                  document.getElementById(dayMap[days]);
              });
@@ -377,7 +382,7 @@ window.courses({"DEPT": "AGRI"}).first();
          function clearCalendarTable() {
              dayMap = {'M': 'monCol', 'T': 'tueCol', 'W': 'wedCol', 'H': 'thurCol', 'F': 'friCol'};
              week = 'MTWHF';
-             earliestHour = 7;
+             earliestHour = 6;
              latestHour   = 21;
              for (var day = 0; day < week.length; day++) {
                  for (var hour = earliestHour; hour <= latestHour; hour++ ) {
@@ -400,15 +405,24 @@ window.courses({"DEPT": "AGRI"}).first();
                  filterRemoveLink.appendChild(document.createTextNode("[(x) " + k + "=" + v + "]"));
                  filterRemoveLink.href = "#";
 
-                 filterRemoveLink.addEventListener('click', function () {
-                     console.log("Clearing filter "+k+"="+v);
+                 /* This is a "closure", it is a function which
+                 generates a new function that has 'closed over' the k
+                 and v variables. That new function is added as the
+                 onClick event listener to call deleteFilter(k,v) and
+                 other clean up when a link is clicked. */
+                 var filterRemoveLinkClosure = function(k,v) {
+                     return function () {
+                         console.log("Clearing filter "+k+"="+v);
 
-                     window.filters.deleteFilter(k,v);
-                     applyFilters();
-                     displayCurrentFilters();
+                         window.filters.deleteFilter(k,v);
+                         applyFilters();
+                         displayCurrentFilters();
 
-                     return false;
-                 }, false);
+                         return false;
+                         }
+                 }
+
+                 filterRemoveLink.addEventListener('click', filterRemoveLinkClosure(k,v), false);
 
                  currentFiltersElement.appendChild(filterRemoveLink);
 
