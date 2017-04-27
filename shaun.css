@@ -10,11 +10,11 @@ body {
             text-align:center;
             font:20pt bold,"Vollkorn";color:#bbb
         }
-        
+
 #b64data{
             width:100%;
         }
-           
+
 select {
             max-width: 100px;
             margin: 4px;
@@ -25,9 +25,9 @@ table {
         }
 td, tr {
             padding: 10px;
-            margin: 10px;            
+            margin: 10px;
         }
-        
+
 tr:nth-child(even) {
             background-color: lightgray;
         }
@@ -43,3 +43,18 @@ tr:nth-child(even) {
     background-color: #ffa31a;
     background-color: black;
 }*/
+
+a {
+    text-decoration: none;
+    margin-right: 8px;
+}
+a:hover {
+    text-decoration: underline;
+}
+a:visited {
+    color: red;
+}
+
+select {
+    width:30em;
+}

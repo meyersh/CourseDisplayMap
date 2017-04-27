@@ -299,16 +299,23 @@
 
                  /* undefined start times go at 0700 */
                  starthour = record["STARTHOUR"]
-                 if (starthour == undefined) {
+          /*       if (starthour == undefined) {
                      starthour = 6;
-                 }
+                 } */
 
                  /* Process MTWThF */
                  days = days.replace('TH', 'H');
 
                  dayMap = {'M': 'monCol', 'T': 'tueCol', 'W': 'wedCol', 'H': 'thurCol', 'F': 'friCol'};
                  for (var i = 0, len = days.length; i < len; i++) {
+                     /* Try to put the course in a given hour row,
+                     otherwise put it on the generic top-of-list
+                     row. */
                      var cellId = dayMap[days[i]] + starthour + "Hour";
+                     if (!cellId) {
+                         var cellId = dayMap[days[i]];
+                     }
+
                      cellObj = document.getElementById(cellId);
                      if (!cellObj) {
                          console.warn("Missing cell obj for " + cellId);
@@ -353,12 +360,12 @@
          function displayCurrentFilters() {
              /* Display current filters (the filters themselves, not the report) */
              currentFiltersElement = document.getElementById('currentFilters');
-             currentFiltersElement.innerHTML = "Current Filters: <br/>\n";
+             currentFiltersElement.innerHTML = "Current Filters: (click to remove) <br/>\n";
              window.filters.listFilters().map(function(f) {
                  /* listFilters returns [key, val] for each filter. */
                  [k, v] = f;
                  filterRemoveLink = document.createElement('a');
-                 filterRemoveLink.appendChild(document.createTextNode("[(x) " + k + "=" + v + "]"));
+                 filterRemoveLink.appendChild(document.createTextNode("(x) " + k + "=" + v + ""));
                  filterRemoveLink.href = "#";
 
                  /* This is a "closure", it is a function which
