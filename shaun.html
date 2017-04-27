@@ -2,381 +2,459 @@
 <!-- xlsx.js (C) 2013-present  SheetJS http://sheetjs.com -->
 <!-- vim: set ts=2: -->
 <html>
-	<head>
-		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<title>JS-XLSX Live Demo</title>
-		<style>
-		#drop{
-			border:2px dashed #bbb;
-			-moz-border-radius:5px;
-			-webkit-border-radius:5px;
-			border-radius:5px;
-			padding:25px;
-			text-align:center;
-			font:20pt bold,"Vollkorn";color:#bbb
-		}
-		#b64data{
-			width:100%;
-		}
-		</style>
-	</head>
-	<body>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>JS-XLSX Live Demo</title>
+        <style>
+         #drop{
+             border:2px dashed #bbb;
+             -moz-border-radius:5px;
+             -webkit-border-radius:5px;
+             border-radius:5px;
+             padding:25px;
+             text-align:center;
+             font:20pt bold,"Vollkorn";color:#bbb
+         }
+         #b64data{
+             width:100%;
+         }
+        </style>
+    </head>
+    <body>
 
 
-		<div id="drop">Drop a spreadsheet file here to see sheet data</div>
-		<p><input type="file" name="xlfile" id="xlf" /> ... or click here to select a file</p>
-		
-
-		<p>
-			<form id="filtersForm">
-				<input type="button" id="clearBtn" value="clear all filters" />
-				<input type="button" id="applyBtn" value="add selected filters" />
-			</form>
-		</p>
-		<pre id="out"></pre>
-		<br />
-		<div id="results"></div>
-
-		<p>
-			TAFFY query examples / notes:
-			<pre>
-sheets["2018-10"]({"COURSE": {like:"AGRI"}}).count();
-sheets["2018-10"]({"COURSE": {like:"AGRI"}}).first();
-sheets["2018-10"]({"DEPT": "AGRI"}).first();
-
-			</pre>
-		</p>
-		
-		<script src="js/js-xlsx/shim.js"></script>
-		<script src="js/taffydb/taffy.js"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.9.1/xlsx.full.min.js"></script>
-		<script src="flags.json"></script>
-		<script>
-		    /*jshint browser:true */
-		    /*global XLSX */
-		    var X = XLSX;
-		    var XW = {
-			    /* worker message */
-			    msg: 'xlsx',
-			    /* worker scripts */
-			    rABS: './js/js-xlsx/xlsxworker2.js',
-			    norABS: './js/js-xlsx/xlsxworker1.js',
-			    noxfer: './js/js-xlsx/xlsxworker.js'
-		    };
-
-		    var rABS = typeof FileReader !== "undefined" && typeof FileReader.prototype !== "undefined" && typeof FileReader.prototype.readAsBinaryString !== "undefined";
-		    var use_worker = false;
-
-		    var transferable = use_worker;
-
-		    var wtf_mode = false;
-
-		    function fixdata(data) {
-			    var o = "", l = 0, w = 10240;
-			    for(; l<data.byteLength/w; ++l) o+=String.fromCharCode.apply(null,new Uint8Array(data.slice(l*w,l*w+w)));
-			    o+=String.fromCharCode.apply(null, new Uint8Array(data.slice(l*w)));
-			    return o;
-		    }
-
-		    function ab2str(data) {
-			    var o = "", l = 0, w = 10240;
-			    for(; l<data.byteLength/w; ++l) o+=String.fromCharCode.apply(null,new Uint16Array(data.slice(l*w,l*w+w)));
-			    o+=String.fromCharCode.apply(null, new Uint16Array(data.slice(l*w)));
-			    return o;
-		    }
-
-		    function s2ab(s) {
-			    var b = new ArrayBuffer(s.length*2), v = new Uint16Array(b);
-			    for (var i=0; i != s.length; ++i) v[i] = s.charCodeAt(i);
-			    return [v, b];
-		    }
-
-		    function xw_noxfer(data, cb) {
-			    var worker = new Worker(XW.noxfer);
-			    worker.onmessage = function(e) {
-				    switch(e.data.t) {
-					    case 'ready': break;
-					    case 'e': console.error(e.data.d); break;
-					    case XW.msg: cb(JSON.parse(e.data.d)); break;
-				    }
-			    };
-			    var arr = rABS ? data : btoa(fixdata(data));
-			    worker.postMessage({d:arr,b:rABS});
-		    }
-
-		    function xw_xfer(data, cb) {
-			    var worker = new Worker(rABS ? XW.rABS : XW.norABS);
-			    worker.onmessage = function(e) {
-				    switch(e.data.t) {
-					    case 'ready': break;
-					    case 'e': console.error(e.data.d); break;
-					    default: xx=ab2str(e.data).replace(/\n/g,"\\n").replace(/\r/g,"\\r"); console.log("done"); cb(JSON.parse(xx)); break;
-				    }
-			    };
-			    if(rABS) {
-				    var val = s2ab(data);
-				    worker.postMessage(val[1], [val[1]]);
-			    } else {
-				    worker.postMessage(data, [data]);
-			    }
-		    }
-
-		    function xw(data, cb) {
-			    if(transferable) xw_xfer(data, cb);
-			    else xw_noxfer(data, cb);
-		    }
-
-		    function get_radio_value( radioName ) {
-			    var radios = document.getElementsByName( radioName );
-			    for( var i = 0; i < radios.length; i++ ) {
-				    if( radios[i].checked || radios.length === 1 ) {
-					    return radios[i].value;
-				    }
-			    }
-		    }
+        <div id="drop">Drop a spreadsheet file here to see sheet data</div>
+        <p><input type="file" name="xlfile" id="xlf" /> ... or click here to select a file</p>
 
 
-		    function to_shaun(workbook) {
-			    var result = [];
-			    window.courses = TAFFY();
-			    window.sheets = {};
-			    workbook.SheetNames.forEach(function(sheetName) {
-				    var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
-				    if(csv.length > 0){
-					    result.push("READING XLS SHEET: " + sheetName);
-					    result.push(csv.length + " RECORDS.");
-					    result.push("");
+        <p>
+            <form id="filtersForm">
+                <input type="button" id="clearBtn" value="clear all filters" />
+                <input type="button" id="applyBtn" value="add selected filters" />
+            </form>
+        </p>
+        <pre id="out"></pre>
+        <pre id="currentFilters"></pre>
+        <br />
+        <table id="calendar" border="1">
 
-					    /* Iterate over each row to tidy up the data. */
-					    for (var i = 0; i < csv.length; i++) {
-						    /* Use Object.assign() to fill in missing fields from previous record. */
-						    if (!csv[i]['COURSE']) {
-							    Object.assign(csv[i], csv[i-1]);
-							    console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
-						    }
-						    
-						    /* Split COURSE (DEPT*341*001) into three columns for easier queries. */
-						    [csv[i]['DEPT'], csv[i]['NUMBER'], csv[i]['SECT']] = csv[i]["COURSE"].split("*");
-						    
-						    /* Split course time into STARTTIME and ENDTIME for easier queries. */
-						    if (csv[i]["O.TIME"]) {
-							    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = csv[i]["O.TIME"].split("-");
-						    } else {
-							    [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = [undefined, undefined];
-						    }
-						    
-					    }
-					    
-					    window.sheets[sheetName] = TAFFY(csv);
-					    window.courses.merge(csv);
-
-					    /*
-					       resultxb.push("DISTINCT DEPARTMENTS: ");
-					       result.push(window.sheets[sheetName]({DEPT: {isUndefined: false}}).distinct("DEPT").join("\n"));
-					       result.push("");
-					     */
-					    /* result.push(window.sheets[sheetName]({STARTTIME: {isUndefined: false}}).distinct("STARTTIME").sort().join("\n ")); */
-					    window.csv = csv;
-				    }
-			    });
-			    return result.join("\n");
-		    }
-
-		    var tarea = document.getElementById('b64data');
-		    function b64it() {
-			    if(typeof console !== 'undefined') console.log("onload", new Date());
-			    var wb = X.read(tarea.value, {type: 'base64',WTF:wtf_mode});
-			    process_wb(wb);
-		    }
-
-		    function showFilterControls() {
-			    /* 
-			     * grab the first element off the TAFFY
-			     * database, iterate its keys (excluding 
-			     * privates named by '__xx') and show the
-			     * distinct * list as a control panel. Cool.
-			     */
-			    output = document.getElementById('filtersForm');
-			    
-			    Object.keys(window.courses().first()).filter(function(v) {return !v.startsWith("_");}).forEach(function(k) {
-				    /* For each header `k`, do the following: */
-				    console.log(k);
-				    selectbox = document.createElement("select");
-				    selectbox.id = k;
-				    newoption = document.createElement("option");
-				    newoption.text = k;
-				    selectbox.add(newoption);
-				    
-				    window.courses().distinct(k).filter(function(x){return x != undefined}).map(function (record,recordnumber) {
-					    console.log(record);
-					    newoption = document.createElement("option");
-					    newoption.text = record;
-					    selectbox.add(newoption);
-						    
-				    });
-
-				    output.appendChild(selectbox);
-					    
-					    
-			    });
-		    }
-
-		    function filterKeys() {
-			    /* Return an array of the filter keys
-			    (DEPT, TERM, etc) that we know about. */
-			    return Object.keys(window.courses().first()).filter(function(k){return !k.startsWith("_")});
-		    }
-		    
-		    applyBtn = document.getElementById("applyBtn");
-		    function applyFilters() {
-			    
-			    console.log("Applying them filters.");
-			    /* Build the list of filters */
-			    filterKeys().map(function(k) {
-				    console.log(k);
-				    filterSelect = document.getElementById(k);
-				    selectedValue = filterSelect.options[filterSelect.selectedIndex].text;
-				    if (selectedValue != k) { /* k would be TERM, or COURSE, or whatever default value , we skip those. */
-
-					    /* window.filters[k] must always be a list, so create it as one, or append, to add new things. */
-					    if (window.filters[k] && !(selectedValue in window.filters[k])) {
-						    window.filters[k].push(selectedValue);
-					    } else {
-						    window.filters[k] = [selectedValue];
-					    }
-
-					    /* Reset drop down value and log changes. */
-
-					    filterSelect.selectedIndex = 0;
-					    console.log("Filter on: " + k + "=" + selectedValue);
-				    }
-			    });
-
-			    console.log("Filtered to " + window.courses(window.filters).count());
-
-			    /* Show results. */
-			    document.getElementById('results').innerHTML = '<table border="1">' +
-				    window.courses(window.filters).supplant("<tr><td>{TERM}</td><td>{COURSE}</td><td>{STARTTIME}-{ENDTIME}</td><td>{O.DAY}</td></tr>") +
-				    "</table>";
-			    
-			    
-		    }
-		    applyBtn.addEventListener('click', applyFilters, false);
-		    
-		    function clearFilters() {
-			    /* Clear list of applied filters. */
-			    window.filters = {};
-			    console.info('Filters cleared.');
-		    }
-		    document.getElementById("clearBtn").addEventListener('click', clearFilters, false);
-
-		    
-		    function process_wb(wb) {
-			    var output = "";
-			    output = to_shaun(wb);
-			    
-			    if(out.innerText === undefined) out.textContent = output;
-			    else out.innerText = output;
-			    if(typeof console !== 'undefined') console.log("output", new Date());
-			    
-			    /*
-			     * Entry point into other code.
-			     */
-			    
-			    showFilterControls();
-		    }
-
-		    var drop = document.getElementById('drop');
-		    function handleDrop(e) {
-			    e.stopPropagation();
-			    e.preventDefault();
-			    // rABS = document.getElementsByName("userabs")[0].checked;
-			    // use_worker = document.getElementsByName("useworker")[0].checked;
-			    var files = e.dataTransfer.files;
-			    var f = files[0];
-			    var reader = new FileReader();
-			    var name = f.name;
-			    reader.onload = function(e) {
-				    if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
-				    var data = e.target.result;
-				    if(use_worker) {
-					    xw(data, process_wb);
-				    } else {
-					    var wb;
-					    if(rABS) {
-						    wb = X.read(data, {type: 'binary'});
-					    } else {
-						    var arr = fixdata(data);
-						    wb = X.read(btoa(arr), {type: 'base64'});
-					    }
-					    process_wb(wb);
-				    }
-			    };
-			    if(rABS) reader.readAsBinaryString(f);
-			    else reader.readAsArrayBuffer(f);
-		    }
-
-		    function handleDragover(e) {
-			    e.stopPropagation();
-			    e.preventDefault();
-			    e.dataTransfer.dropEffect = 'copy';
-		    }
-
-		    if(drop.addEventListener) {
-			    drop.addEventListener('dragenter', handleDragover, false);
-			    drop.addEventListener('dragover', handleDragover, false);
-			    drop.addEventListener('drop', handleDrop, false);
-		    }
+            <tr><th>Time</th><td>MON</td><td>TUE</td><td>WED</td><td>THUR</td><td>FRI</td></tr>
+            <tr><td id="hourCol"></td><td id="monCol"></td><td id="tueCol"></td><td id="wedCol"></td><td id="thurCol"></td><td id="friCol"></td></tr>
+            <tr><td id="HOURCol7Hour">7:00</td><td id="monCol7Hour"></td><td id="tueCol7Hour"></td><td id="wedCol7Hour"></td><td id="thurCol7Hour"></td><td id="friCol7Hour"></td></tr>
+            <tr><td id="HOURCol8Hour">8:00</td><td id="monCol8Hour"></td><td id="tueCol8Hour"></td><td id="wedCol8Hour"></td><td id="thurCol8Hour"></td><td id="friCol8Hour"></td></tr>
+            <tr><td id="HOURCol9Hour">9:00</td><td id="monCol9Hour"></td><td id="tueCol9Hour"></td><td id="wedCol9Hour"></td><td id="thurCol9Hour"></td><td id="friCol9Hour"></td></tr>
+            <tr><td id="HOURCol10Hour">10:00</td><td id="monCol10Hour"></td><td id="tueCol10Hour"></td><td id="wedCol10Hour"></td><td id="thurCol10Hour"></td><td id="friCol10Hour"></td></tr>
+            <tr><td id="HOURCol11Hour">11:00</td><td id="monCol11Hour"></td><td id="tueCol11Hour"></td><td id="wedCol11Hour"></td><td id="thurCol11Hour"></td><td id="friCol11Hour"></td></tr>
+            <tr><td id="HOURCol12Hour">12:00</td><td id="monCol12Hour"></td><td id="tueCol12Hour"></td><td id="wedCol12Hour"></td><td id="thurCol12Hour"></td><td id="friCol12Hour"></td></tr>
+            <tr><td id="HOURCol13Hour">13:00</td><td id="monCol13Hour"></td><td id="tueCol13Hour"></td><td id="wedCol13Hour"></td><td id="thurCol13Hour"></td><td id="friCol13Hour"></td></tr>
+            <tr><td id="HOURCol14Hour">14:00</td><td id="monCol14Hour"></td><td id="tueCol14Hour"></td><td id="wedCol14Hour"></td><td id="thurCol14Hour"></td><td id="friCol14Hour"></td></tr>
+            <tr><td id="HOURCol15Hour">15:00</td><td id="monCol15Hour"></td><td id="tueCol15Hour"></td><td id="wedCol15Hour"></td><td id="thurCol15Hour"></td><td id="friCol15Hour"></td></tr>
+            <tr><td id="HOURCol16Hour">16:00</td><td id="monCol16Hour"></td><td id="tueCol16Hour"></td><td id="wedCol16Hour"></td><td id="thurCol16Hour"></td><td id="friCol16Hour"></td></tr>
+            <tr><td id="HOURCol17Hour">17:00</td><td id="monCol17Hour"></td><td id="tueCol17Hour"></td><td id="wedCol17Hour"></td><td id="thurCol17Hour"></td><td id="friCol17Hour"></td></tr>
+            <tr><td id="HOURCol18Hour">18:00</td><td id="monCol18Hour"></td><td id="tueCol18Hour"></td><td id="wedCol18Hour"></td><td id="thurCol18Hour"></td><td id="friCol18Hour"></td></tr>
+            <tr><td id="HOURCol19Hour">19:00</td><td id="monCol19Hour"></td><td id="tueCol19Hour"></td><td id="wedCol19Hour"></td><td id="thurCol19Hour"></td><td id="friCol19Hour"></td></tr>
+            <tr><td id="HOURCol20Hour">20:00</td><td id="monCol20Hour"></td><td id="tueCol20Hour"></td><td id="wedCol20Hour"></td><td id="thurCol20Hour"></td><td id="friCol20Hour"></td></tr>
+            <tr><td id="HOURCol21Hour">21:00</td><td id="monCol21Hour"></td><td id="tueCol21Hour"></td><td id="wedCol21Hour"></td><td id="thurCol21Hour"></td><td id="friCol21Hour"></td></tr>
 
 
-		    var xlf = document.getElementById('xlf');
-		    function handleFile(e) {
-			    //rABS = document.getElementsByName("userabs")[0].checked;
-			    var files = e.target.files;
-			    var f = files[0];
-			    {
-				    var reader = new FileReader();
-				    var name = f.name;
-				    reader.onload = function(e) {
-					    if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
-					    var data = e.target.result;
-					    if(use_worker) {
-						    xw(data, process_wb);
-					    } else {
-						    var wb;
-						    if(rABS) {
-							    wb = X.read(data, {type: 'binary'});
-						    } else {
-							    var arr = fixdata(data);
-							    wb = X.read(btoa(arr), {type: 'base64'});
-						    }
-						    process_wb(wb);
-					    }
-				    };
-				    if(rABS) reader.readAsBinaryString(f);
-				    else reader.readAsArrayBuffer(f);
-			    }
-		    }
+        </table>
+        <div id="results"></div>
 
-		    if(xlf.addEventListener) xlf.addEventListener('change', handleFile, false);
+        <p>
+            TAFFY query examples / notes:
+            <pre>
+window.courses({"COURSE": {like:"AGRI"}}).count();
+window.courses({"COURSE": {like:"AGRI"}}).first();
+window.courses({"DEPT": "AGRI"}).first();
+
+            </pre>
+        </p>
+
+        <script src="js/js-xlsx/shim.js"></script>
+        <script src="js/taffydb/taffy.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.9.1/xlsx.full.min.js"></script>
+        <script src="flags.json"></script>
+        <script>
+         /*jshint browser:true */
+         /*global XLSX */
+         var X = XLSX;
+         var XW = {
+             /* worker message */
+             msg: 'xlsx',
+             /* worker scripts */
+             rABS: './js/js-xlsx/xlsxworker2.js',
+             norABS: './js/js-xlsx/xlsxworker1.js',
+             noxfer: './js/js-xlsx/xlsxworker.js'
+         };
+
+         var rABS = typeof FileReader !== "undefined" && typeof FileReader.prototype !== "undefined" && typeof FileReader.prototype.readAsBinaryString !== "undefined";
+         var use_worker = false;
+
+         var transferable = use_worker;
+
+         var wtf_mode = false;
+
+         function fixdata(data) {
+             var o = "", l = 0, w = 10240;
+             for(; l<data.byteLength/w; ++l) o+=String.fromCharCode.apply(null,new Uint8Array(data.slice(l*w,l*w+w)));
+             o+=String.fromCharCode.apply(null, new Uint8Array(data.slice(l*w)));
+             return o;
+         }
+
+         function ab2str(data) {
+             var o = "", l = 0, w = 10240;
+             for(; l<data.byteLength/w; ++l) o+=String.fromCharCode.apply(null,new Uint16Array(data.slice(l*w,l*w+w)));
+             o+=String.fromCharCode.apply(null, new Uint16Array(data.slice(l*w)));
+             return o;
+         }
+
+         function s2ab(s) {
+             var b = new ArrayBuffer(s.length*2), v = new Uint16Array(b);
+             for (var i=0; i != s.length; ++i) v[i] = s.charCodeAt(i);
+             return [v, b];
+         }
+
+         function xw_noxfer(data, cb) {
+             var worker = new Worker(XW.noxfer);
+             worker.onmessage = function(e) {
+                 switch(e.data.t) {
+                     case 'ready': break;
+                     case 'e': console.error(e.data.d); break;
+                     case XW.msg: cb(JSON.parse(e.data.d)); break;
+                 }
+             };
+             var arr = rABS ? data : btoa(fixdata(data));
+             worker.postMessage({d:arr,b:rABS});
+         }
+
+         function xw_xfer(data, cb) {
+             var worker = new Worker(rABS ? XW.rABS : XW.norABS);
+             worker.onmessage = function(e) {
+                 switch(e.data.t) {
+                     case 'ready': break;
+                     case 'e': console.error(e.data.d); break;
+                     default: xx=ab2str(e.data).replace(/\n/g,"\\n").replace(/\r/g,"\\r"); console.log("done"); cb(JSON.parse(xx)); break;
+                 }
+             };
+             if(rABS) {
+                 var val = s2ab(data);
+                 worker.postMessage(val[1], [val[1]]);
+             } else {
+                 worker.postMessage(data, [data]);
+             }
+         }
+
+         function xw(data, cb) {
+             if(transferable) xw_xfer(data, cb);
+             else xw_noxfer(data, cb);
+         }
+
+         function get_radio_value( radioName ) {
+             var radios = document.getElementsByName( radioName );
+             for( var i = 0; i < radios.length; i++ ) {
+                 if( radios[i].checked || radios.length === 1 ) {
+                     return radios[i].value;
+                 }
+             }
+         }
+
+         function timestampTo24Hours(ts) {
+             /* Take a timestamp, like 08:00am and return the 24-hour hour portion. */
+             if (ts.search('am') != -1)
+                 meridiem = 0;
+             else
+                 meridiem = 12;
+
+             hour = parseInt(ts.split(':')[0]);
+
+             if (meridiem == 12 && hour < 12)
+                 return hour + 12
+             else if (meridiem == 0 && hour == 12)
+                 return 0
+             else
+                 return hour
+
+         }
 
 
-		    window.onload = function() {
-			    /* Perform any necessary initialization of resources. */
-			    clearFilters()
-		    }
-		    
-		</script>
-		<script type="text/javascript">
-		    var _gaq = _gaq || [];
-		    _gaq.push(['_setAccount', 'UA-36810333-1']);
-		    _gaq.push(['_trackPageview']);
+         function to_shaun(workbook) {
+             var result = [];
+             window.courses = TAFFY();
+             window.sheets = {};
+             workbook.SheetNames.forEach(function(sheetName) {
+                 var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
+                 if(csv.length > 0){
+                     result.push("READING XLS SHEET: " + sheetName);
+                     result.push(csv.length + " RECORDS.");
+                     result.push("");
 
-		    (function() {
-			    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-			    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-			    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-		    })();
-		</script>
-	</body>
+                     /* Iterate over each row to tidy up the data. */
+                     for (var i = 0; i < csv.length; i++) {
+                         /* Use Object.assign() to fill in missing fields from previous record. */
+                         if (!csv[i]['COURSE']) {
+                             Object.assign(csv[i], csv[i-1]);
+                             console.log("Filling in the gaps on record " + i + " = " + csv[i-1]['COURSE']);
+                         }
+
+                         /* Split COURSE (DEPT*341*001) into three columns for easier queries. */
+                         [csv[i]['DEPT'], csv[i]['NUMBER'], csv[i]['SECT']] = csv[i]["COURSE"].split("*");
+
+                         /* Split course time into STARTTIME and ENDTIME for easier queries. */
+                         if (csv[i]["O.TIME"] && csv[i]["O.TIME"] != undefined && csv[i]["O.TIME"] != "-") {
+                             [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = csv[i]["O.TIME"].split("-");
+                             csv[i]['STARTHOUR'] = String(timestampTo24Hours(csv[i]['STARTTIME']));
+                             if (isNaN(csv[i]['STARTHOUR']))
+                                 console.warn(csv[i]['O.TIME']);
+                         } else {
+                             [csv[i]['STARTTIME'], csv[i]['ENDTIME']] = [undefined, undefined];
+                             csv[i]['STARTHOUR'] = undefined;
+                         }
+
+                     }
+
+                     window.sheets[sheetName] = TAFFY(csv);
+                     window.courses.merge(csv);
+
+                     /*
+                        resultxb.push("DISTINCT DEPARTMENTS: ");
+                        result.push(window.sheets[sheetName]({DEPT: {isUndefined: false}}).distinct("DEPT").join("\n"));
+                        result.push("");
+                      */
+                     /* result.push(window.sheets[sheetName]({STARTTIME: {isUndefined: false}}).distinct("STARTTIME").sort().join("\n ")); */
+                     window.csv = csv;
+                 }
+             });
+             return result.join("\n");
+         }
+
+         var tarea = document.getElementById('b64data');
+         function b64it() {
+             if(typeof console !== 'undefined') console.log("onload", new Date());
+             var wb = X.read(tarea.value, {type: 'base64',WTF:wtf_mode});
+             process_wb(wb);
+         }
+
+         function showFilterControls() {
+             /*
+              * grab the first element off the TAFFY
+              * database, iterate its keys (excluding
+              * privates named by '__xx') and show the
+              * distinct * list as a control panel. Cool.
+              */
+             output = document.getElementById('filtersForm');
+
+             Object.keys(window.courses().first()).filter(function(v) {return !v.startsWith("_");}).forEach(function(k) {
+                 /* For each header `k`, do the following: */
+                 console.log(k);
+                 selectbox = document.createElement("select");
+                 selectbox.id = k;
+                 newoption = document.createElement("option");
+                 newoption.text = k;
+                 selectbox.add(newoption);
+
+                 window.courses().distinct(k).filter(function(x){return x != undefined}).sort().map(function (record,recordnumber) {
+                     console.log(record);
+                     newoption = document.createElement("option");
+                     newoption.text = record;
+                     selectbox.add(newoption);
+
+                 });
+
+                 output.appendChild(selectbox);
+
+
+             });
+         }
+
+         function filterKeys() {
+             /* Return an array of the filter keys
+                (DEPT, TERM, etc) that we know about. */
+             return Object.keys(window.courses().first()).filter(function(k){return !k.startsWith("_")});
+         }
+
+         applyBtn = document.getElementById("applyBtn");
+         function applyFilters() {
+
+             console.log("Applying them filters.");
+             /* Build the list of filters */
+             filterKeys().map(function(k) {
+                 console.log(k);
+                 filterSelect = document.getElementById(k);
+                 selectedValue = filterSelect.options[filterSelect.selectedIndex].text;
+                 if (selectedValue != k) { /* k would be TERM, or COURSE, or whatever default value , we skip those. */
+
+                     /* window.filters[k] must always be a list, so create it as one, or append, to add new things. */
+                     if (window.filters[k] && !(selectedValue in window.filters[k])) {
+                         window.filters[k].push(selectedValue);
+                     } else {
+                         window.filters[k] = [selectedValue];
+                     }
+
+                     /* Reset drop down value and log changes. */
+
+                     filterSelect.selectedIndex = 0;
+                     console.log("Filter on: " + k + "=" + selectedValue);
+                 }
+             });
+
+             console.log("Filtered to " + window.courses(window.filters).count());
+
+             /* Show results. */
+             document.getElementById('results').innerHTML = '<table border="1">' +
+                                                            window.courses(window.filters).supplant("<tr><td>{TERM}</td><td>{COURSE}</td><td>{STARTTIME}-{ENDTIME}</td><td>{O.DAY}</td></tr>") +
+                                                            "</table>";
+
+             window.courses(window.filters).map(function (record, result) {
+                 console.log(record);
+
+                 days = record["O.DAY"];
+                 if (days == "TBA" || days == undefined) {
+                     return;
+                 }
+
+                 starthour = record["STARTHOUR"]
+                 if (starthour == undefined) {
+                     starthour = 7;
+                 }
+                 /* MTWThF */
+                 days = days.replace('Th', 'H');
+                 console.log("Processing " + days);
+
+                 dayMap = {'M': 'monCol', 'T': 'tueCol', 'W': 'wedCol', 'H': 'thurCol', 'F': 'friCol'};
+                 for (var i = 0, len = days.length; i < len; i++) {
+                     document.getElementById(dayMap[days[i]] + starthour + "Hour").innerHTML += record['COURSE'] + "<br/>";
+                 }
+                 document.getElementById(dayMap[days]);
+             });
+
+             displayCurrentFilters();
+
+         }
+         applyBtn.addEventListener('click', applyFilters, false);
+
+         function clearFilters() {
+             /* Clear list of applied filters. */
+             window.filters = {};
+             console.info('Filters cleared.');
+
+             displayCurrentFilters();
+
+
+         }
+         document.getElementById("clearBtn").addEventListener('click', clearFilters, false);
+
+         function displayCurrentFilters() {
+             /* Display current filters */
+             document.getElementById('currentFilters').innerHTML = "Current Filters: \n" + JSON.stringify(window.filters);
+         }
+
+         function process_wb(wb) {
+             var output = "";
+             output = to_shaun(wb);
+
+             if(out.innerText === undefined) out.textContent = output;
+             else out.innerText = output;
+             if(typeof console !== 'undefined') console.log("output", new Date());
+
+             /*
+              * Entry point into other code.
+              */
+
+             showFilterControls();
+         }
+
+         var drop = document.getElementById('drop');
+         function handleDrop(e) {
+             e.stopPropagation();
+             e.preventDefault();
+             // rABS = document.getElementsByName("userabs")[0].checked;
+             // use_worker = document.getElementsByName("useworker")[0].checked;
+             var files = e.dataTransfer.files;
+             var f = files[0];
+             var reader = new FileReader();
+             var name = f.name;
+             reader.onload = function(e) {
+                 if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
+                 var data = e.target.result;
+                 if(use_worker) {
+                     xw(data, process_wb);
+                 } else {
+                     var wb;
+                     if(rABS) {
+                         wb = X.read(data, {type: 'binary'});
+                     } else {
+                         var arr = fixdata(data);
+                         wb = X.read(btoa(arr), {type: 'base64'});
+                     }
+                     process_wb(wb);
+                 }
+             };
+             if(rABS) reader.readAsBinaryString(f);
+             else reader.readAsArrayBuffer(f);
+         }
+
+         function handleDragover(e) {
+             e.stopPropagation();
+             e.preventDefault();
+             e.dataTransfer.dropEffect = 'copy';
+         }
+
+         if(drop.addEventListener) {
+             drop.addEventListener('dragenter', handleDragover, false);
+             drop.addEventListener('dragover', handleDragover, false);
+             drop.addEventListener('drop', handleDrop, false);
+         }
+
+
+         var xlf = document.getElementById('xlf');
+         function handleFile(e) {
+             //rABS = document.getElementsByName("userabs")[0].checked;
+             var files = e.target.files;
+             var f = files[0];
+             {
+                 var reader = new FileReader();
+                 var name = f.name;
+                 reader.onload = function(e) {
+                     if(typeof console !== 'undefined') console.log("onload", new Date(), rABS, use_worker);
+                     var data = e.target.result;
+                     if(use_worker) {
+                         xw(data, process_wb);
+                     } else {
+                         var wb;
+                         if(rABS) {
+                             wb = X.read(data, {type: 'binary'});
+                         } else {
+                             var arr = fixdata(data);
+                             wb = X.read(btoa(arr), {type: 'base64'});
+                         }
+                         process_wb(wb);
+                     }
+                 };
+                 if(rABS) reader.readAsBinaryString(f);
+                 else reader.readAsArrayBuffer(f);
+             }
+         }
+
+         if(xlf.addEventListener) xlf.addEventListener('change', handleFile, false);
+
+
+         window.onload = function() {
+             /* Perform any necessary initialization of resources. */
+             clearFilters()
+                 applyFilters();
+         }
+
+        </script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', 'UA-36810333-1']);
+         _gaq.push(['_trackPageview']);
+
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    </body>
 </html>
