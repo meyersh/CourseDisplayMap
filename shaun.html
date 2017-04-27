@@ -74,6 +74,7 @@ window.courses({"DEPT": "AGRI"}).first();
         <script src="js/taffydb/taffy.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.9.1/xlsx.full.min.js"></script>
         <script src="flags.json"></script>
+        <script src="js/filters.js"></script>
         <script>
          /*jshint browser:true */
          /*global XLSX */
@@ -275,54 +276,65 @@ window.courses({"DEPT": "AGRI"}).first();
          applyBtn = document.getElementById("applyBtn");
          function applyFilters() {
 
+             /*
+              * Read in the filters control panel
+              */
+
              console.log("Applying them filters.");
-             /* Build the list of filters */
+             /* Build the list of filters by iterating over the
+             filterKeys() to check each dynamic DropDown Box. */
              filterKeys().map(function(k) {
                  console.log(k);
                  filterSelect = document.getElementById(k);
                  selectedValue = filterSelect.options[filterSelect.selectedIndex].text;
-                 if (selectedValue != k) { /* k would be TERM, or COURSE, or whatever default value , we skip those. */
+                 if (selectedValue != k) { /* k would be TERM, or
+                                            * COURSE, or whatever default value , we skip those. */
+                     window.filters.addFilter(k, selectedValue);
 
-                     /* window.filters[k] must always be a list, so create it as one, or append, to add new things. */
-                     if (window.filters[k] && !(selectedValue in window.filters[k])) {
-                         window.filters[k].push(selectedValue);
-                     } else {
-                         window.filters[k] = [selectedValue];
-                     }
-
-                     /* Reset drop down value and log changes. */
-
+                     /* Reset dropdown box */
                      filterSelect.selectedIndex = 0;
                      console.log("Filter on: " + k + "=" + selectedValue);
                  }
              });
 
-             console.log("Filtered to " + window.courses(window.filters).count());
+             console.log("Filtered to " + window.courses(window.filters.generateQuery()).count());
 
-             /* Show results. */
+             /*
+              * Apply filters from the window.filters Object
+              */
+
+             /* Show results. (Stat Table) */
              document.getElementById('results').innerHTML = '<table border="1">' +
-                                                            window.courses(window.filters).supplant("<tr><td>{TERM}</td><td>{COURSE}</td><td>{STARTTIME}-{ENDTIME}</td><td>{O.DAY}</td></tr>") +
+                                                            window.courses(window.filters.generateQuery()).supplant("<tr><td>{TERM}</td><td>{COURSE}</td><td>{STARTTIME}-{ENDTIME}</td><td>{O.DAY}</td></tr>") +
                                                             "</table>";
 
-             window.courses(window.filters).map(function (record, result) {
+             /* Show results. (Graphic calendar table) By iterating
+             over each record and placing it into the correct table
+                cell. */
+             clearCalendarTable();
+             window.courses(window.filters.generateQuery()).map(function (record, result) {
                  console.log(record);
 
+                 /* Skip undefined days */
                  days = record["O.DAY"];
                  if (days == "TBA" || days == undefined) {
                      return;
                  }
 
+                 /* undefined start times go at 0700 */
                  starthour = record["STARTHOUR"]
                  if (starthour == undefined) {
                      starthour = 7;
                  }
-                 /* MTWThF */
-                 days = days.replace('Th', 'H');
+
+                 /* Process MTWThF */
+                 days = days.replace('TH', 'H');
                  console.log("Processing " + days);
 
                  dayMap = {'M': 'monCol', 'T': 'tueCol', 'W': 'wedCol', 'H': 'thurCol', 'F': 'friCol'};
                  for (var i = 0, len = days.length; i < len; i++) {
-                     document.getElementById(dayMap[days[i]] + starthour + "Hour").innerHTML += record['COURSE'] + "<br/>";
+                     var cellId = dayMap[days[i]] + starthour + "Hour";
+                     document.getElementById(cellId).innerHTML += record['COURSE'] + "<br/>";
                  }
                  document.getElementById(dayMap[days]);
              });
@@ -334,18 +346,53 @@ window.courses({"DEPT": "AGRI"}).first();
 
          function clearFilters() {
              /* Clear list of applied filters. */
-             window.filters = {};
-             console.info('Filters cleared.');
-
+             window.filters.clearFilters();
+             clearCalendarTable();
              displayCurrentFilters();
-
+             console.info('Filters cleared.');
 
          }
          document.getElementById("clearBtn").addEventListener('click', clearFilters, false);
 
+         function clearCalendarTable() {
+             dayMap = {'M': 'monCol', 'T': 'tueCol', 'W': 'wedCol', 'H': 'thurCol', 'F': 'friCol'};
+             week = 'MTWHF';
+             earliestHour = 7;
+             latestHour   = 21;
+             for (var day = 0; day < week.length; day++) {
+                 for (var hour = earliestHour; hour <= latestHour; hour++ ) {
+                     var cellId = dayMap[week[day]] + hour + "Hour";
+                     document.getElementById(cellId).innerHTML = "";
+                     console.log("Clearing cell.");
+                 }
+             }
+
+         }
+
          function displayCurrentFilters() {
              /* Display current filters */
-             document.getElementById('currentFilters').innerHTML = "Current Filters: \n" + JSON.stringify(window.filters);
+             currentFiltersElement = document.getElementById('currentFilters');
+             currentFiltersElement.innerHTML = "Current Filters: \n";
+             window.filters.listFilters().map(function(f) {
+                 /* listFilters returns [key, val] for each filter. */
+                 [k, v] = f;
+                 filterRemoveLink = document.createElement('a');
+                 filterRemoveLink.appendChild(document.createTextNode("[(x) " + k + "=" + v + "]"));
+                 filterRemoveLink.href = "#";
+
+                 filterRemoveLink.addEventListener('click', function () {
+                     console.log("Clearing filter "+k+"="+v);
+
+                     window.filters.deleteFilter(k,v);
+                     applyFilters();
+                     displayCurrentFilters();
+
+                     return false;
+                 }, false);
+
+                 currentFiltersElement.appendChild(filterRemoveLink);
+
+             });
          }
 
          function process_wb(wb) {
@@ -440,8 +487,9 @@ window.courses({"DEPT": "AGRI"}).first();
 
          window.onload = function() {
              /* Perform any necessary initialization of resources. */
-             clearFilters()
-                 applyFilters();
+             window.courses = TAFFY();
+             clearFilters();
+             applyFilters();
          }
 
         </script>
