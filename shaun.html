@@ -234,7 +234,6 @@ window.courses({"DEPT": "AGRI"}).first();
 
                      }
 
-                     window.sheets[sheetName] = TAFFY(csv);
                      window.courses.merge(csv);
 
                      /*
@@ -391,7 +390,7 @@ window.courses({"DEPT": "AGRI"}).first();
          }
 
          function displayCurrentFilters() {
-             /* Display current filters */
+             /* Display current filters (the filters themselves, not the report) */
              currentFiltersElement = document.getElementById('currentFilters');
              currentFiltersElement.innerHTML = "Current Filters: \n";
              window.filters.listFilters().map(function(f) {
