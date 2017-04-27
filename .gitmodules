@@ -1,0 +1,6 @@
+[submodule "js/js-xlsx"]
+	path = js/js-xlsx
+	url = https://github.com/SheetJS/js-xlsx.git
+[submodule "js/taffydb"]
+	path = js/taffydb
+	url = https://github.com/typicaljoe/taffydb.git
