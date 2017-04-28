@@ -147,7 +147,14 @@
              window.courses = TAFFY();
              window.sheets = {};
              workbook.SheetNames.forEach(function(sheetName) {
-                 var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
+                 /* The way the spreadsheet works, lines can sort of
+                    "wrap". The apparent distinction from LABS (which
+                    we have to fill in fields for below) and "wrapped"
+                    lines seems to be the absence of a "O.TIME". TBA
+                    courses have '-' for the time, everyone else has
+                    an actual time, so only wrapped courses are left
+                    and we want to filter those. */
+                 var csv = X.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]).filter(function (record) {return record['O.TIME']});
                  if(csv.length > 0){
                      console.info("READING XLS SHEET: " + sheetName);
                      console.info(csv.length + " RECORDS.");
