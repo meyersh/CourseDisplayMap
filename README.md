@@ -48,11 +48,11 @@ To accomodate General Education flag data filters, whose data is *not* in the sp
 ## Spreadsheet maintenance
 Spreadsheet headers (row 1) are read dynamically, so adding, removing, or reordering headings shouldn't cause any problems. There are two *required* fields: O.TIME and COURSE, although either may be blank. They are interpreted as follows.
 
- - COURSE
+ - `COURSE`
  
- If it is not blank, must be of the form DEPT*NUM*SEC (such as CSCI*100*001 for CSCI 100, section 001). If these are missing, DEPT, NUMBER, and SECT are `undefined`.
+ If it is not blank, must be of the form `DEPT*NUM*SEC` (such as `CSCI*100*001` for CSCI 100, section 001). If these are missing, DEPT, NUMBER, and SECT are `undefined`.
  
- - O.TIME
+ - `O.TIME`
  
  O.TIME is expected to be blank (an overflow record, and the entire record is ignored) or a hyphen separeted field of two times, eg "9:00AM-10:00PM" and is split by '-', either devation from this format will render STARTTIME and ENDTIME undefined, as well as monkey with STARTHOUR which is used for graphical display. 
  
